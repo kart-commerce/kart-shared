@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    # kart-conventions.md: "CI: service repos call the reusable workflow published from kart-devops."
+    # kart-shared publishes NuGet packages, it does not ship a container, so the reusable
+    # workflow's Docker smoke-build step is disabled here (there is no Dockerfile in this repo).
+    uses: kart-commerce/kart-devops/.github/workflows/dotnet-service-ci.yml@main
+    with:
+      dotnet-version: "8.0.x"
+      solution-path: Kart.Shared.sln
+      run-docker-build: false
+
+  pack:
+    name: Pack (dotnet pack)
+    needs: ci
+    runs-on: ubuntu-latest
+    # release-0-platform-bootstrap.md's deliverable for this repo: "every src/ project must
+    # still be pack-able (dotnet pack)" -- not covered by the reusable workflow above since
+    # packing is unique to this repo among Phase-0 repos, not shared CI/CD behavior yet.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore Kart.Shared.sln
+
+      - name: Pack
+        run: dotnet pack Kart.Shared.sln --configuration Release --no-restore
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages
+          path: artifacts/packages/*.nupkg

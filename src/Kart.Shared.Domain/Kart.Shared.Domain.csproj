@@ -3,6 +3,11 @@
   <PropertyGroup>
     <PackageId>Kart.Shared.Domain</PackageId>
     <Description>Common DDD base types (Result/Error, AggregateRoot, IDomainEvent, OutboxEventBase) shared across Kart's microservices. Generic building blocks only — never domain logic.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
 </Project>

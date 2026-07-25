@@ -6,6 +6,8 @@ using FluentValidation.Results;
 using Kart.Shared.ErrorHandling;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -50,9 +52,9 @@ public class KartExceptionHandlerTests : IAsyncLifetime
             });
         });
 
-        _app.MapGet("/mapped", () => throw new CustomConflictException("already exists"));
+        _app.MapGet("/mapped", () => { throw new CustomConflictException("already exists"); });
 
-        _app.MapGet("/boom", () => throw new InvalidOperationException("unexpected failure"));
+        _app.MapGet("/boom", () => { throw new InvalidOperationException("unexpected failure"); });
 
         await _app.StartAsync();
         _client = _app.GetTestClient();

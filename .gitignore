@@ -1,3 +1,14 @@
+# .NET build output
+[Bb]in/
+[Oo]bj/
+artifacts/
+*.user
+*.suo
+.vs/
+
+# JetBrains Rider / IntelliJ
+.idea/
+
 # Logs
 logs
 *.log

@@ -3,7 +3,12 @@
   <PropertyGroup>
     <PackageId>Kart.Shared.Observability</PackageId>
     <Description>Serilog + OpenTelemetry SDK wiring (ASP.NET Core/HttpClient/Npgsql/EF Core instrumentation, OTLP exporter) behind one DI registration call, per kart-conventions.md's Observability section.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <!--
     Same stack + versions every one of Kart's services already wires locally
