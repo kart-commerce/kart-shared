@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Kart.Shared.Domain</PackageId>
+    <Description>Common DDD base types (Result/Error, AggregateRoot, IDomainEvent, OutboxEventBase) shared across Kart's microservices. Generic building blocks only — never domain logic.</Description>
+  </PropertyGroup>
+
+</Project>

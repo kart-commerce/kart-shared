@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Kart.Shared.Auditing</PackageId>
+    <Description>Shared audit-log-entry writer abstraction ("one platform-wide implementation, not built locally by each service" — kart-conventions.md's Observability section, referencing kart-requirements.md §24.3).</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />
+  </ItemGroup>
+
+</Project>

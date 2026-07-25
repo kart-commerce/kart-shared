@@ -1,0 +1,91 @@
+{
+  "format": 1,
+  "restore": {
+    "/home/kakon/Developer/Personal/kart-commerce/kart-shared/src/Kart.Shared.ErrorHandling/Kart.Shared.ErrorHandling.csproj": {}
+  },
+  "projects": {
+    "/home/kakon/Developer/Personal/kart-commerce/kart-shared/src/Kart.Shared.ErrorHandling/Kart.Shared.ErrorHandling.csproj": {
+      "version": "0.1.0",
+      "restore": {
+        "projectUniqueName": "/home/kakon/Developer/Personal/kart-commerce/kart-shared/src/Kart.Shared.ErrorHandling/Kart.Shared.ErrorHandling.csproj",
+        "projectName": "Kart.Shared.ErrorHandling",
+        "projectPath": "/home/kakon/Developer/Personal/kart-commerce/kart-shared/src/Kart.Shared.ErrorHandling/Kart.Shared.ErrorHandling.csproj",
+        "packagesPath": "/home/kakon/.nuget/packages/",
+        "outputPath": "/home/kakon/Developer/Personal/kart-commerce/kart-shared/src/Kart.Shared.ErrorHandling/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/home/kakon/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "http://nuget.selise.biz/nuget": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "9.0.300"
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "FluentValidation": {
+              "target": "Package",
+              "version": "[11.3.0, )"
+            },
+            "Microsoft.Extensions.Options": {
+              "target": "Package",
+              "version": "[8.0.2, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "downloadDependencies": [
+            {
+              "name": "Microsoft.AspNetCore.App.Ref",
+              "version": "[8.0.23, 8.0.23]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Ref",
+              "version": "[8.0.23, 8.0.23]"
+            }
+          ],
+          "frameworkReferences": {
+            "Microsoft.AspNetCore.App": {
+              "privateAssets": "none"
+            },
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "/home/kakon/.dotnet/sdk/9.0.310/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

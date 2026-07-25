@@ -1,0 +1,29 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <WarningsAsErrors>Nullable</WarningsAsErrors>
+  </PropertyGroup>
+
+  <!--
+    kart-shared's packages are consumed as versioned NuGet packages, not shared source
+    (PLATFORM_BLUEPRINT.md §2.2 item 3 / §2.4: "treat it like a public API with semver").
+    There is no real feed to publish to yet, but every src/ project must still be
+    pack-able (`dotnet pack`) — that's this release's deliverable, per
+    docs/releases/generated/release-0-platform-bootstrap.md. Every package starts at
+    0.1.0 and follows SemVer from here on; test projects opt out below.
+  -->
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Version>0.1.0</Version>
+    <PackageVersion>0.1.0</PackageVersion>
+    <Authors>Kart Commerce</Authors>
+    <Company>Kart Commerce</Company>
+    <PackageOutputPath>$(MSBuildThisFileDirectory)artifacts/packages</PackageOutputPath>
+    <RepositoryUrl>https://github.com/kart-commerce/kart-shared</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+  </PropertyGroup>
+</Project>

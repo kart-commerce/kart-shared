@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "cTal7Wfjvxk=",
+  "success": true,
+  "projectFilePath": "/home/kakon/Developer/Personal/kart-commerce/kart-shared/src/Kart.Shared.Domain/Kart.Shared.Domain.csproj",
+  "expectedPackageFiles": [
+    "/home/kakon/.nuget/packages/microsoft.netcore.app.ref/8.0.23/microsoft.netcore.app.ref.8.0.23.nupkg.sha512",
+    "/home/kakon/.nuget/packages/microsoft.aspnetcore.app.ref/8.0.23/microsoft.aspnetcore.app.ref.8.0.23.nupkg.sha512"
+  ],
+  "logs": []
+}
