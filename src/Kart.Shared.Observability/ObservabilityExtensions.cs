@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -20,11 +21,18 @@ namespace Kart.Shared.Observability;
 /// </summary>
 public static class ObservabilityExtensions
 {
+    // Human-readable — used in Development on both the console and (when configured) the file
+    // sink, since neither has a collector tailing it for a human to instead read compact JSON.
+    private const string DevelopmentOutputTemplate =
+        "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext}{NewLine}{Message:lj}{NewLine}{Exception}";
+
     /// <summary>
-    /// Wires Serilog (structured JSON to console; shipping to Loki is the OTel Collector's job,
-    /// never something the process does directly) and the OpenTelemetry SDK (ASP.NET Core,
-    /// HttpClient, EF Core, and raw Npgsql tracing; ASP.NET Core, HttpClient, and runtime
-    /// metrics; OTLP exporter when an endpoint is configured; Prometheus scrape endpoint always).
+    /// Wires Serilog (compact JSON to console in every environment but Development, where a
+    /// human is reading stdout directly instead of a collector — a plain templated console
+    /// there instead; an additional rolling-file sink when configured) and the OpenTelemetry SDK
+    /// (ASP.NET Core, HttpClient, EF Core, and raw Npgsql tracing; ASP.NET Core, HttpClient, and
+    /// runtime metrics; OTLP exporter when an endpoint is configured; Prometheus scrape endpoint
+    /// always).
     /// </summary>
     /// <param name="serviceName">
     /// This service's OpenTelemetry resource name and Serilog "service" enrichment property —
@@ -42,13 +50,51 @@ public static class ObservabilityExtensions
 
         var otlpEndpoint = builder.Configuration[options.OtlpEndpointConfigurationKey];
 
-        builder.Host.UseSerilog((context, services, loggerConfiguration) => loggerConfiguration
-            .ReadFrom.Configuration(context.Configuration)
-            .ReadFrom.Services(services)
-            .Enrich.FromLogContext()
-            .Enrich.WithSpan()
-            .Enrich.WithProperty("service", serviceName)
-            .WriteTo.Console(new CompactJsonFormatter()));
+        builder.Host.UseSerilog((context, services, loggerConfiguration) =>
+        {
+            loggerConfiguration
+                .ReadFrom.Configuration(context.Configuration)
+                .ReadFrom.Services(services)
+                .Enrich.FromLogContext()
+                .Enrich.WithSpan()
+                .Enrich.WithProperty("service", serviceName);
+
+            var isDevelopment = context.HostingEnvironment.IsDevelopment();
+
+            if (isDevelopment)
+            {
+                loggerConfiguration.WriteTo.Console(outputTemplate: DevelopmentOutputTemplate);
+            }
+            else
+            {
+                loggerConfiguration.WriteTo.Console(new CompactJsonFormatter());
+            }
+
+            var logFileDirectory = context.Configuration[options.LogFileDirectoryConfigurationKey];
+            if (!string.IsNullOrWhiteSpace(logFileDirectory))
+            {
+                var logFilePath = Path.Combine(logFileDirectory, $"{serviceName}-.log");
+
+                if (isDevelopment)
+                {
+                    loggerConfiguration.WriteTo.File(
+                        logFilePath,
+                        outputTemplate: DevelopmentOutputTemplate,
+                        rollingInterval: RollingInterval.Day,
+                        rollOnFileSizeLimit: true,
+                        fileSizeLimitBytes: options.LogFileSizeLimitBytes);
+                }
+                else
+                {
+                    loggerConfiguration.WriteTo.File(
+                        new CompactJsonFormatter(),
+                        logFilePath,
+                        rollingInterval: RollingInterval.Day,
+                        rollOnFileSizeLimit: true,
+                        fileSizeLimitBytes: options.LogFileSizeLimitBytes);
+                }
+            }
+        });
 
         builder.Services.AddOpenTelemetry()
             .ConfigureResource(resource => resource.AddService(serviceName))

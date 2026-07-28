@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Kart.Shared.Configuration</PackageId>
+    <Description>Per-machine config bootstrap (GlobalConfig external secrets file + a gitignored local override for its path) behind one DI registration call, per PLATFORM_BLUEPRINT.md's Configuration Management section.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- WebApplicationBuilder — needed for a class library exposing an extension method on it. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>

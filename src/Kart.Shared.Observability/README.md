@@ -8,9 +8,17 @@ locally by each service."
 
 One call, `AddKartObservability(serviceName)`, on `WebApplicationBuilder`:
 
-- **Serilog** — structured JSON to console (shipping to Loki is the OpenTelemetry Collector's job,
-  never something the process does directly), enriched with `LogContext`, span/trace ids
+- **Serilog** — compact JSON to console in every environment except Development (shipping to Loki
+  is the OpenTelemetry Collector's job, never something the process does directly); in
+  Development, a plain templated console instead, since there's no collector tailing stdout there
+  and a human is reading it directly. Enriched with `LogContext`, span/trace ids
   (`Serilog.Enrichers.Span`), and a `service` property.
+- **Rolling file log** (opt-in) — when `Observability:LogFile:Directory` (configurable) is set, an
+  additional sink writes to `{directory}/{serviceName}-.log`, rolling daily and every 10 MB
+  (both configurable via `KartObservabilityOptions`). This is a local dev convenience: the
+  directory is expected to come from a per-machine source (e.g. this service's own GlobalConfig
+  file via `Kart.Shared.Configuration`), never a value committed to source control. Unset by
+  default — no file sink is added unless a directory is configured.
 - **OpenTelemetry tracing** — ASP.NET Core, `HttpClient`, EF Core, and raw Npgsql instrumentation;
   OTLP exporter when `Observability:Otlp:Endpoint` (configurable) is set.
 - **OpenTelemetry metrics** — ASP.NET Core, `HttpClient`, and .NET runtime instrumentation; a
@@ -39,11 +47,15 @@ does not yet expose a sampling-tier knob — until it does, a service on the 100
 its own `Sampler` (e.g. `TracerProviderBuilder.SetSampler(new AlwaysOnSampler())`) after calling
 `AddKartObservability`, or via `configure` once this package grows that option.
 
-## Adoption status (as of 2026-07-25)
+## Adoption status (as of 2026-07-28)
 
 Generalized verbatim from kart-category-service's and kart-identity-service's own
 (byte-for-byte identical, aside from `ServiceName`) interim `ObservabilityExtensions` — this
-package is a drop-in replacement for both; neither has migrated to it yet.
+package is a drop-in replacement for both. Adopted by `kart-cart-service`,
+`kart-delivery-tracking-service`, `kart-offer-service`, `kart-payment-service`,
+`kart-product-service`, `kart-search-service`, and `kart-user-service`; `kart-category-service`,
+`kart-identity-service`, and `kart-inventory-service` are migrating onto it (0.2.0) alongside this
+release's file-sink/Development-console addition, retiring their own interim copies.
 
 ## Known gap
 

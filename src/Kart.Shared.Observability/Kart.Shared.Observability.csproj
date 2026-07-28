@@ -6,6 +6,16 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
+  <!--
+    0.2.0: additive, non-breaking (readable console template in Development + an opt-in
+    WriteTo.File sink) — only this package's version moves, not the other three in this
+    repo, per Directory.Build.props' per-package SemVer policy.
+  -->
+  <PropertyGroup>
+    <Version>0.2.0</Version>
+    <PackageVersion>0.2.0</PackageVersion>
+  </PropertyGroup>
+
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
@@ -19,6 +29,7 @@
   <ItemGroup>
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageReference Include="Serilog.Formatting.Compact" Version="3.0.0" />
     <PackageReference Include="Serilog.Enrichers.Environment" Version="3.0.1" />
     <PackageReference Include="Serilog.Enrichers.Span" Version="3.1.0" />
