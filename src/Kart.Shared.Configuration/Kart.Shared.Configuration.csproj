@@ -6,6 +6,18 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
+  <!--
+    0.2.0: breaking — AddKartGlobalConfig now requires a serviceName argument, and the file it
+    reads moved from "the whole file is this one service's secrets" to a shared
+    Global + Services:<serviceName> shape (kart-conventions.md's Semantic Versioning rule: any
+    public API break bumps this package's version, per Directory.Build.props' per-package
+    SemVer policy — same pattern Kart.Shared.Observability's 0.1.0 -> 0.2.0 bump used).
+  -->
+  <PropertyGroup>
+    <Version>0.2.0</Version>
+    <PackageVersion>0.2.0</PackageVersion>
+  </PropertyGroup>
+
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>

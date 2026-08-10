@@ -12,9 +12,13 @@ public sealed class KartGlobalConfigOptions
     public string LocalOverrideFileName { get; set; } = "appsettings.Local.json";
 
     /// <summary>
-    /// Configuration key holding the absolute path to this service's GlobalConfig file — a
-    /// per-machine, gitignored JSON file holding real local secrets (connection strings,
-    /// signing keys, etc.), layered on top of everything read so far.
+    /// Configuration key holding the absolute path to the shared GlobalConfig file — a
+    /// per-machine, gitignored JSON file holding every service's real local secrets (connection
+    /// strings, signing keys, etc.) under its own <c>Services:&lt;serviceName&gt;</c> section,
+    /// plus a <c>Global</c> section of platform-wide defaults every service inherits — layered
+    /// on top of everything read so far. Which <c>Services</c> section applies is the
+    /// <c>serviceName</c> argument passed to <c>AddKartGlobalConfig</c> directly, not an option
+    /// here.
     /// </summary>
     public string PathConfigurationKey { get; set; } = "GlobalConfig:Path";
 }
