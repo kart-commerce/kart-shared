@@ -57,7 +57,7 @@ public static class RabbitMqTopologyProvisioner
             var arguments = new Dictionary<string, object>
             {
                 ["x-message-ttl"] = tier.TtlMs,
-                ["x-dead-letter-exchange"] = string.Empty,
+                ["x-dead-letter-exchange"] = string.Empty, // Default exchange
                 ["x-dead-letter-routing-key"] = retryLadder.RequeueTo,
             };
             channel.QueueDeclare(tier.Name, durable: true, exclusive: false, autoDelete: false, arguments: arguments);
