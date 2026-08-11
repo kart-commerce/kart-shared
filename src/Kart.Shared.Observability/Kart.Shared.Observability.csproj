@@ -7,13 +7,17 @@
   </PropertyGroup>
 
   <!--
-    0.2.0: additive, non-breaking (readable console template in Development + an opt-in
-    WriteTo.File sink) — only this package's version moves, not the other three in this
-    repo, per Directory.Build.props' per-package SemVer policy.
+    0.3.0: additive, non-breaking — closes the "Serilog console sink output is expected to be
+    shipped to the Collector's OTLP log receiver" gap this package's own README previously left
+    unimplemented (see README "Known gap"): an OTLP log exporter now actually ships logs to Loki
+    via the Collector when Observability:Otlp:Endpoint is configured, and every log line is
+    enriched with a "Flow"/"Service" (capitalized, alongside the existing lowercase "service")
+    pair per the platform-wide business-flow tracing standard — only this package's version
+    moves, per Directory.Build.props' per-package SemVer policy.
   -->
   <PropertyGroup>
-    <Version>0.2.0</Version>
-    <PackageVersion>0.2.0</PackageVersion>
+    <Version>0.3.0</Version>
+    <PackageVersion>0.3.0</PackageVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -34,6 +38,7 @@
     <PackageReference Include="Serilog.Enrichers.Environment" Version="3.0.1" />
     <PackageReference Include="Serilog.Enrichers.Span" Version="3.1.0" />
     <PackageReference Include="Serilog.Settings.Configuration" Version="10.0.1" />
+    <PackageReference Include="Serilog.Sinks.OpenTelemetry" Version="4.2.0" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.17.0" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.17.0" />

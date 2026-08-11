@@ -6,9 +6,14 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
+  <!--
+    0.2.0: additive, non-breaking — adds RabbitMqTraceContext (W3C traceparent stamp-on-publish /
+    extract-on-consume + a shared ActivitySource), closing the "RabbitMQ has no built-in OTel
+    instrumentation" gap flagged in Kart.Shared.Observability's own README.
+  -->
   <PropertyGroup>
-    <Version>0.1.0</Version>
-    <PackageVersion>0.1.0</PackageVersion>
+    <Version>0.2.0</Version>
+    <PackageVersion>0.2.0</PackageVersion>
   </PropertyGroup>
 
   <ItemGroup>

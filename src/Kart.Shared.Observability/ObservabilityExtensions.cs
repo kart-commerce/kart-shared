@@ -7,6 +7,7 @@ using OpenTelemetry.Trace;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Formatting.Compact;
+using Serilog.Sinks.OpenTelemetry;
 
 namespace Kart.Shared.Observability;
 
@@ -57,7 +58,15 @@ public static class ObservabilityExtensions
                 .ReadFrom.Services(services)
                 .Enrich.FromLogContext()
                 .Enrich.WithSpan()
-                .Enrich.WithProperty("service", serviceName);
+                .Enrich.With<FlowEnricher>()
+                .Enrich.WithProperty("service", serviceName)
+                // Capitalized alias alongside the existing lowercase "service" property (kept for
+                // back-compat with anything already querying it) — the platform-wide business-
+                // flow tracing standard's mandatory field set is Timestamp/Service/Flow/TraceId/
+                // SpanId/Stage/Level/Message; Timestamp/Level/Message come from Serilog itself,
+                // TraceId/SpanId from .Enrich.WithSpan() above, Flow from FlowEnricher, and Stage
+                // is passed explicitly per log call (it changes line-to-line, unlike Flow).
+                .Enrich.WithProperty("Service", serviceName);
 
             var isDevelopment = context.HostingEnvironment.IsDevelopment();
 
@@ -68,6 +77,23 @@ public static class ObservabilityExtensions
             else
             {
                 loggerConfiguration.WriteTo.Console(new CompactJsonFormatter());
+            }
+
+            // Closes this package's own previously-documented gap: the Console/File sinks above
+            // are for a human (or a local `tail`) reading stdout directly — neither one actually
+            // ships a log line to the Collector. Every log line reaching Loki, correlated by
+            // TraceId with its Tempo span, depends on this sink existing.
+            if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+            {
+                loggerConfiguration.WriteTo.OpenTelemetry(otlpOptions =>
+                {
+                    otlpOptions.Endpoint = otlpEndpoint;
+                    otlpOptions.Protocol = OtlpProtocol.Grpc;
+                    otlpOptions.ResourceAttributes = new Dictionary<string, object>
+                    {
+                        ["service.name"] = serviceName,
+                    };
+                });
             }
 
             var logFileDirectory = context.Configuration[options.LogFileDirectoryConfigurationKey];
@@ -106,7 +132,12 @@ public static class ObservabilityExtensions
                     .AddEntityFrameworkCoreInstrumentation()
                     // Npgsql emits its own ActivitySource ("Npgsql") natively since v6+ — no
                     // separate instrumentation package needed, just opt the tracer into it.
-                    .AddSource("Npgsql");
+                    .AddSource("Npgsql")
+                    // Kart.Shared.Messaging.RabbitMqTraceContext's publish/consume spans — OTel
+                    // has no built-in RabbitMQ instrumentation, so every service using that
+                    // helper needs its ActivitySource opted into the tracer the same way Npgsql's
+                    // is above, or its spans are created but never exported.
+                    .AddSource("Kart.Shared.Messaging.RabbitMq");
 
                 if (!string.IsNullOrWhiteSpace(otlpEndpoint))
                 {
