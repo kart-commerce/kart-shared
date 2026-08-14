@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Kart.Shared.Messaging</PackageId>
+    <Description>RabbitMQ topology-from-manifest wiring (manifest types/loader, idempotent topology declaration, startup hosted service, retry-ladder-aware consumer base class) behind a few DI registration calls, per kart-conventions.md's Messaging section.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <!--
+    0.2.0: additive, non-breaking — adds RabbitMqTraceContext (W3C traceparent stamp-on-publish /
+    extract-on-consume + a shared ActivitySource), closing the "RabbitMQ has no built-in OTel
+    instrumentation" gap flagged in Kart.Shared.Observability's own README.
+
+    0.3.0: additive, non-breaking — RabbitMqConsumerHostedServiceBase now starts a consume span
+    (via RabbitMqTraceContext) around every delivery automatically, so a subclass gets trace
+    propagation with zero code changes; adds a 4-arg ProcessAsync overload exposing the inbound
+    IBasicProperties for consumers that need the headers themselves (default delegates to the
+    existing 3-arg overload, so every existing consumer keeps compiling/behaving unchanged); and
+    fixes a retry-ladder defect where redelivery onto the next retry tier silently dropped the
+    original message's headers (traceparent/CorrelationId included) instead of carrying them
+    forward, which broke trace continuity across a retry.
+  -->
+  <PropertyGroup>
+    <Version>0.3.0</Version>
+    <PackageVersion>0.3.0</PackageVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="RabbitMQ.Client" Version="6.8.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+  </ItemGroup>
+
+</Project>
