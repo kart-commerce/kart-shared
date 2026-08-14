@@ -14,10 +14,20 @@
     enriched with a "Flow"/"Service" (capitalized, alongside the existing lowercase "service")
     pair per the platform-wide business-flow tracing standard — only this package's version
     moves, per Directory.Build.props' per-package SemVer policy.
+
+    0.4.0: additive, non-breaking — production/high-TPS hardening: a configurable trace sampling
+    ratio (Observability:Tracing:SamplingRatio, default 1.0 so existing behavior is unchanged),
+    service.instance.id/deployment.environment/service.version resource attributes on every
+    signal, configurable OTLP protocol (Grpc/HttpProtobuf), high-throughput batch/queue/export-
+    interval tuning applied consistently to the Serilog OTLP sink and every OTel SDK OTLP
+    exporter, an EnablePrometheusScrapeEndpoint escape hatch for services fed purely via the
+    Collector's prometheusremotewrite exporter, and prod-safe default Serilog level overrides
+    (Microsoft/System -> Warning) so a service with no "Serilog" appsettings section doesn't
+    flood Loki with framework noise.
   -->
   <PropertyGroup>
-    <Version>0.3.0</Version>
-    <PackageVersion>0.3.0</PackageVersion>
+    <Version>0.4.0</Version>
+    <PackageVersion>0.4.0</PackageVersion>
   </PropertyGroup>
 
   <ItemGroup>

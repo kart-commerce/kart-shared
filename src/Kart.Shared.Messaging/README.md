@@ -61,6 +61,31 @@ public sealed class OrderPlacedConsumerHostedService(
 }
 ```
 
+## Distributed tracing across the broker
+
+OpenTelemetry's auto-instrumentation (wired by `Kart.Shared.Observability`) has no equivalent for
+RabbitMQ — a message hop is otherwise a silent gap in Tempo between "outbox row written" and "read
+model updated." `RabbitMqTraceContext` closes that gap with one shared `ActivitySource`
+(`"Kart.Shared.Messaging.RabbitMq"`, already opted into the tracer by `AddKartObservability`) every
+publisher/consumer on the platform uses:
+
+- **Consuming**: `RabbitMqConsumerHostedServiceBase` starts a consume span automatically around
+  every delivery — nothing to opt into. Override the 4-arg `ProcessAsync` overload (body +
+  `IBasicProperties` + provider + cancellation token) instead of the 3-arg one when a consumer
+  needs the inbound headers itself (e.g. to read `RabbitMqTraceContext.ReadCorrelationId` for a
+  dead-letter handler); the 3-arg overload keeps working unchanged for every existing consumer.
+- **Publishing**: call `RabbitMqTraceContext.StartPublishActivity(exchange, routingKey,
+  properties)` immediately before `BasicPublish`, always in a `using` — this stamps a W3C
+  `traceparent` (plus a human-readable `CorrelationId`) onto the message's headers so the consumer
+  on the other end continues the exact same trace. Publishing from a **Transactional Outbox
+  relay** (a background poller with no ambient `Activity.Current` tied to the original request)
+  needs `StartPublishActivityFromStoredTraceParent` instead, passing the `traceparent` string
+  persisted on the outbox row at write time.
+- **Retry redelivery**: `RabbitMqConsumerHostedServiceBase`'s retry-ladder routing carries the
+  original message's headers forward (`traceparent`/`CorrelationId` included) onto every retry
+  republish — a redelivered message keeps tracing back to its original trace, not a disconnected
+  new one.
+
 ## Building, testing, packing
 
 See the repo-root [`README.md`](../../README.md) — this package builds/tests/packs alongside the

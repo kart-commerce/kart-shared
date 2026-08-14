@@ -1,11 +1,13 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog;
 using Serilog.Enrichers.Span;
+using Serilog.Events;
 using Serilog.Formatting.Compact;
 using Serilog.Sinks.OpenTelemetry;
 
@@ -16,9 +18,9 @@ namespace Kart.Shared.Observability;
 /// Prometheus) behind the one DI registration call kart-conventions.md's Observability section
 /// requires: <c>Kart.Shared.Observability</c>, "wires Serilog + the OpenTelemetry SDK (ASP.NET
 /// Core/HttpClient/Npgsql/EF Core instrumentation, OTLP exporter) with one DI registration call
-/// per service". Generalized verbatim from kart-category-service's and kart-identity-service's
-/// own (byte-for-byte identical, aside from ServiceName) interim <c>ObservabilityExtensions</c> —
-/// this is a drop-in replacement for both.
+/// per service". Every signal (logs, traces, metrics) is exported over OTLP to a single Collector
+/// endpoint; routing each signal type to its backend (Loki/Tempo/Prometheus respectively) is the
+/// Collector's job via its own pipeline config, never something a service decides.
 /// </summary>
 public static class ObservabilityExtensions
 {
@@ -31,9 +33,9 @@ public static class ObservabilityExtensions
     /// Wires Serilog (compact JSON to console in every environment but Development, where a
     /// human is reading stdout directly instead of a collector — a plain templated console
     /// there instead; an additional rolling-file sink when configured) and the OpenTelemetry SDK
-    /// (ASP.NET Core, HttpClient, EF Core, and raw Npgsql tracing; ASP.NET Core, HttpClient, and
-    /// runtime metrics; OTLP exporter when an endpoint is configured; Prometheus scrape endpoint
-    /// always).
+    /// (ASP.NET Core, HttpClient, EF Core, raw Npgsql, and RabbitMQ tracing; ASP.NET Core,
+    /// HttpClient, and runtime metrics; OTLP exporter for every signal when an endpoint is
+    /// configured; Prometheus scrape endpoint by default).
     /// </summary>
     /// <param name="serviceName">
     /// This service's OpenTelemetry resource name and Serilog "service" enrichment property —
@@ -49,11 +51,37 @@ public static class ObservabilityExtensions
         var options = new KartObservabilityOptions();
         configure?.Invoke(options);
 
-        var otlpEndpoint = builder.Configuration[options.OtlpEndpointConfigurationKey];
+        var configuration = builder.Configuration;
+        var environmentName = builder.Environment.EnvironmentName;
+
+        var otlpEndpoint = configuration[options.OtlpEndpointConfigurationKey];
+        var otlpProtocol = ResolveOtlpProtocol(configuration, options);
+        var samplingRatio = ResolveSamplingRatio(configuration, options);
+
+        var resourceAttributes = new Dictionary<string, object>
+        {
+            ["service.name"] = serviceName,
+            ["service.instance.id"] = options.ServiceInstanceId,
+            ["deployment.environment"] = environmentName,
+        };
+        if (!string.IsNullOrWhiteSpace(options.ServiceVersion))
+        {
+            resourceAttributes["service.version"] = options.ServiceVersion;
+        }
 
         builder.Host.UseSerilog((context, services, loggerConfiguration) =>
         {
             loggerConfiguration
+                // Sensible high-TPS-safe floor: applied before ReadFrom.Configuration below, so
+                // any service's own "Serilog" appsettings section still wins when it sets these
+                // explicitly. Without this, a service that never configured a "Serilog" section
+                // at all defaults to logging every ASP.NET Core framework-internal Information
+                // line (request started/finished, routing, etc.) — background noise that drowns
+                // out application signal in Loki at real traffic volume.
+                .MinimumLevel.Information()
+                .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+                .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
+                .MinimumLevel.Override("System", LogEventLevel.Warning)
                 .ReadFrom.Configuration(context.Configuration)
                 .ReadFrom.Services(services)
                 .Enrich.FromLogContext()
@@ -66,7 +94,8 @@ public static class ObservabilityExtensions
                 // SpanId/Stage/Level/Message; Timestamp/Level/Message come from Serilog itself,
                 // TraceId/SpanId from .Enrich.WithSpan() above, Flow from FlowEnricher, and Stage
                 // is passed explicitly per log call (it changes line-to-line, unlike Flow).
-                .Enrich.WithProperty("Service", serviceName);
+                .Enrich.WithProperty("Service", serviceName)
+                .Enrich.WithProperty("service.instance.id", options.ServiceInstanceId);
 
             var isDevelopment = context.HostingEnvironment.IsDevelopment();
 
@@ -82,17 +111,23 @@ public static class ObservabilityExtensions
             // Closes this package's own previously-documented gap: the Console/File sinks above
             // are for a human (or a local `tail`) reading stdout directly — neither one actually
             // ships a log line to the Collector. Every log line reaching Loki, correlated by
-            // TraceId with its Tempo span, depends on this sink existing.
+            // TraceId with its Tempo span, depends on this sink existing. Batched (not
+            // fire-per-line) so a Collector hiccup under sustained high-TPS load queues instead of
+            // blocking the request thread that triggered the log call.
             if (!string.IsNullOrWhiteSpace(otlpEndpoint))
             {
                 loggerConfiguration.WriteTo.OpenTelemetry(otlpOptions =>
                 {
                     otlpOptions.Endpoint = otlpEndpoint;
-                    otlpOptions.Protocol = OtlpProtocol.Grpc;
-                    otlpOptions.ResourceAttributes = new Dictionary<string, object>
+                    otlpOptions.Protocol = otlpProtocol switch
                     {
-                        ["service.name"] = serviceName,
+                        KartOtlpProtocol.HttpProtobuf => Serilog.Sinks.OpenTelemetry.OtlpProtocol.HttpProtobuf,
+                        _ => Serilog.Sinks.OpenTelemetry.OtlpProtocol.Grpc,
                     };
+                    otlpOptions.ResourceAttributes = resourceAttributes;
+                    otlpOptions.BatchingOptions.BatchSizeLimit = options.OtlpMaxExportBatchSize;
+                    otlpOptions.BatchingOptions.QueueLimit = options.OtlpMaxQueueSize;
+                    otlpOptions.BatchingOptions.BufferingTimeLimit = TimeSpan.FromMilliseconds(options.OtlpScheduledDelayMilliseconds);
                 });
             }
 
@@ -122,11 +157,21 @@ public static class ObservabilityExtensions
             }
         });
 
+        var exportProtocol = otlpProtocol switch
+        {
+            KartOtlpProtocol.HttpProtobuf => OtlpExportProtocol.HttpProtobuf,
+            _ => OtlpExportProtocol.Grpc,
+        };
+
         builder.Services.AddOpenTelemetry()
-            .ConfigureResource(resource => resource.AddService(serviceName))
+            .ConfigureResource(resource => resource.AddAttributes(resourceAttributes))
             .WithTracing(tracing =>
             {
                 tracing
+                    // A sampled parent is always honored regardless of ratio — this only governs
+                    // the root-span decision, so a 100%-tier service (the Order Saga) still gets
+                    // full coverage simply by setting its ratio to 1.0 (the default).
+                    .SetSampler(new ParentBasedSampler(new TraceIdRatioBasedSampler(samplingRatio)))
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
                     .AddEntityFrameworkCoreInstrumentation()
@@ -141,7 +186,14 @@ public static class ObservabilityExtensions
 
                 if (!string.IsNullOrWhiteSpace(otlpEndpoint))
                 {
-                    tracing.AddOtlpExporter(otlp => otlp.Endpoint = new Uri(otlpEndpoint));
+                    tracing.AddOtlpExporter(otlp =>
+                    {
+                        otlp.Endpoint = new Uri(otlpEndpoint);
+                        otlp.Protocol = exportProtocol;
+                        otlp.BatchExportProcessorOptions.MaxQueueSize = options.OtlpMaxQueueSize;
+                        otlp.BatchExportProcessorOptions.MaxExportBatchSize = options.OtlpMaxExportBatchSize;
+                        otlp.BatchExportProcessorOptions.ScheduledDelayMilliseconds = options.OtlpScheduledDelayMilliseconds;
+                    });
                 }
             })
             .WithMetrics(metrics =>
@@ -152,15 +204,45 @@ public static class ObservabilityExtensions
                 metrics
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
-                    .AddRuntimeInstrumentation()
-                    .AddPrometheusExporter();
+                    .AddRuntimeInstrumentation();
+
+                if (options.EnablePrometheusScrapeEndpoint)
+                {
+                    metrics.AddPrometheusExporter();
+                }
 
                 if (!string.IsNullOrWhiteSpace(otlpEndpoint))
                 {
-                    metrics.AddOtlpExporter(otlp => otlp.Endpoint = new Uri(otlpEndpoint));
+                    metrics.AddOtlpExporter((otlp, readerOptions) =>
+                    {
+                        otlp.Endpoint = new Uri(otlpEndpoint);
+                        otlp.Protocol = exportProtocol;
+                        readerOptions.PeriodicExportingMetricReaderOptions.ExportIntervalMilliseconds =
+                            options.OtlpMetricsExportIntervalMilliseconds;
+                    });
                 }
             });
 
         return builder;
+    }
+
+    private static KartOtlpProtocol ResolveOtlpProtocol(
+        Microsoft.Extensions.Configuration.IConfiguration configuration,
+        KartObservabilityOptions options)
+    {
+        var configured = configuration[options.OtlpProtocolConfigurationKey];
+        return Enum.TryParse<KartOtlpProtocol>(configured, ignoreCase: true, out var parsed)
+            ? parsed
+            : options.DefaultOtlpProtocol;
+    }
+
+    private static double ResolveSamplingRatio(
+        Microsoft.Extensions.Configuration.IConfiguration configuration,
+        KartObservabilityOptions options)
+    {
+        var configured = configuration[options.TracingSamplingRatioConfigurationKey];
+        return double.TryParse(configured, out var parsed) && parsed is >= 0.0 and <= 1.0
+            ? parsed
+            : options.DefaultTracingSamplingRatio;
     }
 }

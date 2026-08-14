@@ -21,7 +21,7 @@ logic** and **no service-specific types** — only things generic enough to be i
 |---|---|---|
 | `Kart.Shared.Domain` | `Result`/`Error` (Result pattern for domain errors), `AggregateRoot` + `IDomainEvent` (in-process domain events), `OutboxEventBase` (Transactional Outbox row shape) | [src/Kart.Shared.Domain](src/Kart.Shared.Domain/README.md) |
 | `Kart.Shared.ErrorHandling` | Global exception-handling middleware + RFC 7807 `ProblemDetails` factory (`traceId`/`errorCode` extensions) | [src/Kart.Shared.ErrorHandling](src/Kart.Shared.ErrorHandling/README.md) |
-| `Kart.Shared.Observability` | Serilog + OpenTelemetry SDK wiring (ASP.NET Core/HttpClient/Npgsql/EF Core instrumentation, OTLP exporter, Prometheus scrape endpoint) behind one DI call | [src/Kart.Shared.Observability](src/Kart.Shared.Observability/README.md) |
+| `Kart.Shared.Observability` | Serilog + OpenTelemetry SDK wiring (ASP.NET Core/HttpClient/Npgsql/EF Core/RabbitMQ instrumentation, OTLP exporter for every signal, Prometheus scrape endpoint, configurable sampling/high-TPS batch tuning) behind one DI call | [src/Kart.Shared.Observability](src/Kart.Shared.Observability/README.md) |
 | `Kart.Shared.Auditing` | `IAuditLogWriter` contract + `AuditLogEntry` shape for the platform-wide audit trail | [src/Kart.Shared.Auditing](src/Kart.Shared.Auditing/README.md) |
 | `Kart.Shared.Configuration` | Per-machine GlobalConfig bootstrap (`appsettings.Local.json` override + `GlobalConfig:Path` external secrets file) behind one DI call | [src/Kart.Shared.Configuration](src/Kart.Shared.Configuration/README.md) |
 | `Kart.Shared.Messaging` | RabbitMQ topology-from-manifest wiring (manifest types/loader, idempotent topology declaration, startup hosted service, retry-ladder-aware consumer base class) behind a few DI calls | [src/Kart.Shared.Messaging](src/Kart.Shared.Messaging/README.md) |
@@ -37,10 +37,10 @@ Reference the package(s) a service needs in its own `.csproj`:
 ```xml
 <PackageReference Include="Kart.Shared.Domain" Version="0.1.0" />
 <PackageReference Include="Kart.Shared.ErrorHandling" Version="0.1.0" />
-<PackageReference Include="Kart.Shared.Observability" Version="0.2.0" />
+<PackageReference Include="Kart.Shared.Observability" Version="0.4.0" />
 <PackageReference Include="Kart.Shared.Auditing" Version="0.1.0" />
 <PackageReference Include="Kart.Shared.Configuration" Version="0.1.0" />
-<PackageReference Include="Kart.Shared.Messaging" Version="0.1.0" />
+<PackageReference Include="Kart.Shared.Messaging" Version="0.3.0" />
 ```
 
 There is no published feed yet (see `Directory.Build.props`'s note) — until one exists, packages

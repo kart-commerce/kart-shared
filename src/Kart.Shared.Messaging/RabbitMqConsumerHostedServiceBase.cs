@@ -47,6 +47,16 @@ public abstract class RabbitMqConsumerHostedServiceBase : BackgroundService
 
     protected abstract Task ProcessAsync(ReadOnlyMemory<byte> body, IServiceProvider scopedProvider, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Same as the 3-arg <see cref="ProcessAsync(ReadOnlyMemory{byte}, IServiceProvider, CancellationToken)"/>,
+    /// with the inbound message's properties (headers, including a possible <c>traceparent</c>)
+    /// also available. Added non-breaking (default delegates to the 3-arg overload) so every
+    /// existing subclass keeps compiling/behaving unchanged; override this one instead when a
+    /// consumer needs the headers themselves, not just the body.
+    /// </summary>
+    protected virtual Task ProcessAsync(ReadOnlyMemory<byte> body, IBasicProperties properties, IServiceProvider scopedProvider, CancellationToken cancellationToken) =>
+        ProcessAsync(body, scopedProvider, cancellationToken);
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
@@ -86,10 +96,12 @@ public abstract class RabbitMqConsumerHostedServiceBase : BackgroundService
 
     private async Task HandleDeliveryAsync(IModel channel, BasicDeliverEventArgs delivery, CancellationToken stoppingToken)
     {
+        using var activity = RabbitMqTraceContext.StartConsumeActivity(QueueName, delivery.BasicProperties);
+
         try
         {
             using var scope = _scopeFactory.CreateScope();
-            await ProcessAsync(delivery.Body, scope.ServiceProvider, stoppingToken);
+            await ProcessAsync(delivery.Body, delivery.BasicProperties, scope.ServiceProvider, stoppingToken);
             channel.BasicAck(delivery.DeliveryTag, multiple: false);
         }
         catch (Exception ex)
@@ -119,7 +131,14 @@ public abstract class RabbitMqConsumerHostedServiceBase : BackgroundService
         properties.Persistent = true;
         properties.ContentType = delivery.BasicProperties.ContentType;
         properties.MessageId = delivery.BasicProperties.MessageId;
-        properties.Headers = new Dictionary<string, object> { [_retryCountHeaderName] = attempt };
+        // Carry the original headers forward (traceparent/CorrelationId included) instead of
+        // replacing them outright — a previous flow found this exact "retry-ladder drops the
+        // original headers on every redelivery" defect elsewhere on the platform; fixed here too
+        // rather than just noting it, since this base class is the one already being touched.
+        properties.Headers = delivery.BasicProperties.Headers is null
+            ? new Dictionary<string, object>()
+            : new Dictionary<string, object>(delivery.BasicProperties.Headers);
+        properties.Headers[_retryCountHeaderName] = attempt;
 
         channel.BasicPublish(exchange: string.Empty, routingKey: retryQueueName, basicProperties: properties, body: delivery.Body);
         channel.BasicAck(delivery.DeliveryTag, multiple: false);
