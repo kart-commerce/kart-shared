@@ -17,11 +17,22 @@ public enum KartOtlpProtocol
 public sealed class KartObservabilityOptions
 {
     /// <summary>
-    /// Configuration key read for the OTLP exporter endpoint. When absent/blank, the OTLP
-    /// exporters are simply not added — traces/metrics still flow to the console sink and the
-    /// Prometheus scrape endpoint, matching both services' current behavior in local dev.
+    /// Configuration key read for the OTLP exporter endpoint. When absent/blank, falls back to
+    /// <see cref="DefaultOtlpEndpoint"/> — the platform's centralized Collector — so the OTLP
+    /// exporters are effectively always added. <c>AddKartObservability</c> throws if the resolved
+    /// value is still blank after that fallback (e.g. <see cref="DefaultOtlpEndpoint"/> itself was
+    /// overridden to a blank string), rather than silently shipping no telemetry.
     /// </summary>
     public string OtlpEndpointConfigurationKey { get; set; } = "Observability:Otlp:Endpoint";
+
+    /// <summary>
+    /// OTLP endpoint used when <see cref="OtlpEndpointConfigurationKey"/> is absent/blank in
+    /// configuration — every service on the platform ships to this one centralized OTel
+    /// Collector, so defaulting to it here means a service that forgot to configure the key still
+    /// exports telemetry instead of silently going dark. Override only when a service's network
+    /// path to the Collector genuinely differs (e.g. a different Docker Compose network or host).
+    /// </summary>
+    public string DefaultOtlpEndpoint { get; set; } = "http://otel-collector:4317";
 
     /// <summary>Configuration key read for the OTLP wire protocol (<c>"Grpc"</c> or <c>"HttpProtobuf"</c>). Falls back to <see cref="DefaultOtlpProtocol"/> when absent/unparseable.</summary>
     public string OtlpProtocolConfigurationKey { get; set; } = "Observability:Otlp:Protocol";

@@ -34,8 +34,9 @@ public static class ObservabilityExtensions
     /// human is reading stdout directly instead of a collector — a plain templated console
     /// there instead; an additional rolling-file sink when configured) and the OpenTelemetry SDK
     /// (ASP.NET Core, HttpClient, EF Core, raw Npgsql, and RabbitMQ tracing; ASP.NET Core,
-    /// HttpClient, and runtime metrics; OTLP exporter for every signal when an endpoint is
-    /// configured; Prometheus scrape endpoint by default).
+    /// HttpClient, and runtime metrics; OTLP exporter for every signal, always — the endpoint
+    /// defaults to the platform's centralized Collector when unconfigured, and this method throws
+    /// if it still resolves blank; Prometheus scrape endpoint by default).
     /// </summary>
     /// <param name="serviceName">
     /// This service's OpenTelemetry resource name and Serilog "service" enrichment property —
@@ -55,6 +56,19 @@ public static class ObservabilityExtensions
         var environmentName = builder.Environment.EnvironmentName;
 
         var otlpEndpoint = configuration[options.OtlpEndpointConfigurationKey];
+        if (string.IsNullOrWhiteSpace(otlpEndpoint))
+        {
+            otlpEndpoint = options.DefaultOtlpEndpoint;
+        }
+
+        if (string.IsNullOrWhiteSpace(otlpEndpoint))
+        {
+            throw new InvalidOperationException(
+                $"OTLP endpoint is not configured for service '{serviceName}'. Set " +
+                $"'{options.OtlpEndpointConfigurationKey}' in configuration, or a non-blank " +
+                $"{nameof(KartObservabilityOptions)}.{nameof(KartObservabilityOptions.DefaultOtlpEndpoint)}.");
+        }
+
         var otlpProtocol = ResolveOtlpProtocol(configuration, options);
         var samplingRatio = ResolveSamplingRatio(configuration, options);
 
@@ -114,22 +128,19 @@ public static class ObservabilityExtensions
             // TraceId with its Tempo span, depends on this sink existing. Batched (not
             // fire-per-line) so a Collector hiccup under sustained high-TPS load queues instead of
             // blocking the request thread that triggered the log call.
-            if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+            loggerConfiguration.WriteTo.OpenTelemetry(otlpOptions =>
             {
-                loggerConfiguration.WriteTo.OpenTelemetry(otlpOptions =>
+                otlpOptions.Endpoint = otlpEndpoint;
+                otlpOptions.Protocol = otlpProtocol switch
                 {
-                    otlpOptions.Endpoint = otlpEndpoint;
-                    otlpOptions.Protocol = otlpProtocol switch
-                    {
-                        KartOtlpProtocol.HttpProtobuf => Serilog.Sinks.OpenTelemetry.OtlpProtocol.HttpProtobuf,
-                        _ => Serilog.Sinks.OpenTelemetry.OtlpProtocol.Grpc,
-                    };
-                    otlpOptions.ResourceAttributes = resourceAttributes;
-                    otlpOptions.BatchingOptions.BatchSizeLimit = options.OtlpMaxExportBatchSize;
-                    otlpOptions.BatchingOptions.QueueLimit = options.OtlpMaxQueueSize;
-                    otlpOptions.BatchingOptions.BufferingTimeLimit = TimeSpan.FromMilliseconds(options.OtlpScheduledDelayMilliseconds);
-                });
-            }
+                    KartOtlpProtocol.HttpProtobuf => Serilog.Sinks.OpenTelemetry.OtlpProtocol.HttpProtobuf,
+                    _ => Serilog.Sinks.OpenTelemetry.OtlpProtocol.Grpc,
+                };
+                otlpOptions.ResourceAttributes = resourceAttributes;
+                otlpOptions.BatchingOptions.BatchSizeLimit = options.OtlpMaxExportBatchSize;
+                otlpOptions.BatchingOptions.QueueLimit = options.OtlpMaxQueueSize;
+                otlpOptions.BatchingOptions.BufferingTimeLimit = TimeSpan.FromMilliseconds(options.OtlpScheduledDelayMilliseconds);
+            });
 
             var logFileDirectory = context.Configuration[options.LogFileDirectoryConfigurationKey];
             if (!string.IsNullOrWhiteSpace(logFileDirectory))
@@ -184,17 +195,14 @@ public static class ObservabilityExtensions
                     // is above, or its spans are created but never exported.
                     .AddSource("Kart.Shared.Messaging.RabbitMq");
 
-                if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+                tracing.AddOtlpExporter(otlp =>
                 {
-                    tracing.AddOtlpExporter(otlp =>
-                    {
-                        otlp.Endpoint = new Uri(otlpEndpoint);
-                        otlp.Protocol = exportProtocol;
-                        otlp.BatchExportProcessorOptions.MaxQueueSize = options.OtlpMaxQueueSize;
-                        otlp.BatchExportProcessorOptions.MaxExportBatchSize = options.OtlpMaxExportBatchSize;
-                        otlp.BatchExportProcessorOptions.ScheduledDelayMilliseconds = options.OtlpScheduledDelayMilliseconds;
-                    });
-                }
+                    otlp.Endpoint = new Uri(otlpEndpoint);
+                    otlp.Protocol = exportProtocol;
+                    otlp.BatchExportProcessorOptions.MaxQueueSize = options.OtlpMaxQueueSize;
+                    otlp.BatchExportProcessorOptions.MaxExportBatchSize = options.OtlpMaxExportBatchSize;
+                    otlp.BatchExportProcessorOptions.ScheduledDelayMilliseconds = options.OtlpScheduledDelayMilliseconds;
+                });
             })
             .WithMetrics(metrics =>
             {
@@ -211,16 +219,13 @@ public static class ObservabilityExtensions
                     metrics.AddPrometheusExporter();
                 }
 
-                if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+                metrics.AddOtlpExporter((otlp, readerOptions) =>
                 {
-                    metrics.AddOtlpExporter((otlp, readerOptions) =>
-                    {
-                        otlp.Endpoint = new Uri(otlpEndpoint);
-                        otlp.Protocol = exportProtocol;
-                        readerOptions.PeriodicExportingMetricReaderOptions.ExportIntervalMilliseconds =
-                            options.OtlpMetricsExportIntervalMilliseconds;
-                    });
-                }
+                    otlp.Endpoint = new Uri(otlpEndpoint);
+                    otlp.Protocol = exportProtocol;
+                    readerOptions.PeriodicExportingMetricReaderOptions.ExportIntervalMilliseconds =
+                        options.OtlpMetricsExportIntervalMilliseconds;
+                });
             });
 
         return builder;
