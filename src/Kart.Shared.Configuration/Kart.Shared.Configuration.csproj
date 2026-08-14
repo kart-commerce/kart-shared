@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Kart.Shared.Configuration</PackageId>
+    <Description>Per-machine config bootstrap (GlobalConfig external secrets file + a gitignored local override for its path) behind one DI registration call, per PLATFORM_BLUEPRINT.md's Configuration Management section.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <!--
+    0.2.0: breaking — AddKartGlobalConfig now requires a serviceName argument, and the file it
+    reads moved from "the whole file is this one service's secrets" to a shared
+    Global + Services:<serviceName> shape (kart-conventions.md's Semantic Versioning rule: any
+    public API break bumps this package's version, per Directory.Build.props' per-package
+    SemVer policy — same pattern Kart.Shared.Observability's 0.1.0 -> 0.2.0 bump used).
+  -->
+  <PropertyGroup>
+    <Version>0.2.0</Version>
+    <PackageVersion>0.2.0</PackageVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- WebApplicationBuilder — needed for a class library exposing an extension method on it. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>

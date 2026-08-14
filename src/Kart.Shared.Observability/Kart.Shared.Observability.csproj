@@ -6,6 +6,30 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
+  <!--
+    0.3.0: additive, non-breaking — closes the "Serilog console sink output is expected to be
+    shipped to the Collector's OTLP log receiver" gap this package's own README previously left
+    unimplemented (see README "Known gap"): an OTLP log exporter now actually ships logs to Loki
+    via the Collector when Observability:Otlp:Endpoint is configured, and every log line is
+    enriched with a "Flow"/"Service" (capitalized, alongside the existing lowercase "service")
+    pair per the platform-wide business-flow tracing standard — only this package's version
+    moves, per Directory.Build.props' per-package SemVer policy.
+
+    0.4.0: additive, non-breaking — production/high-TPS hardening: a configurable trace sampling
+    ratio (Observability:Tracing:SamplingRatio, default 1.0 so existing behavior is unchanged),
+    service.instance.id/deployment.environment/service.version resource attributes on every
+    signal, configurable OTLP protocol (Grpc/HttpProtobuf), high-throughput batch/queue/export-
+    interval tuning applied consistently to the Serilog OTLP sink and every OTel SDK OTLP
+    exporter, an EnablePrometheusScrapeEndpoint escape hatch for services fed purely via the
+    Collector's prometheusremotewrite exporter, and prod-safe default Serilog level overrides
+    (Microsoft/System -> Warning) so a service with no "Serilog" appsettings section doesn't
+    flood Loki with framework noise.
+  -->
+  <PropertyGroup>
+    <Version>0.4.0</Version>
+    <PackageVersion>0.4.0</PackageVersion>
+  </PropertyGroup>
+
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
@@ -19,10 +43,12 @@
   <ItemGroup>
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageReference Include="Serilog.Formatting.Compact" Version="3.0.0" />
     <PackageReference Include="Serilog.Enrichers.Environment" Version="3.0.1" />
     <PackageReference Include="Serilog.Enrichers.Span" Version="3.1.0" />
     <PackageReference Include="Serilog.Settings.Configuration" Version="10.0.1" />
+    <PackageReference Include="Serilog.Sinks.OpenTelemetry" Version="4.2.0" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.17.0" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.17.0" />
