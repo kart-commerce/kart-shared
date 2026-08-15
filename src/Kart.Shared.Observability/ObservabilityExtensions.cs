@@ -194,13 +194,8 @@ public static class ObservabilityExtensions
                     // helper needs its ActivitySource opted into the tracer the same way Npgsql's
                     // is above, or its spans are created but never exported.
                     .AddSource("Kart.Shared.Messaging.RabbitMq")
-                    // kart-user-service's ReadModelProjectionHostedService: an async-poller CQRS
-                    // read-model write that starts its own span parented off a stored
-                    // OutboxEvent.TraceParent rather than Activity.Current (there is no in-flight
-                    // request/consume activity by the time the poller gets to a row). Harmless to
-                    // register platform-wide for services that never start this source — same
-                    // precedent as "Npgsql" above being registered even for services with no
-                    // database.
+                    // kart-user-service's async read-model projection poller has no in-flight
+                    // request/consume activity to inherit from, so it starts its own span.
                     .AddSource("Kart.User.ReadModelProjection");
 
                 tracing.AddOtlpExporter(otlp =>
