@@ -193,7 +193,10 @@ public static class ObservabilityExtensions
                     // has no built-in RabbitMQ instrumentation, so every service using that
                     // helper needs its ActivitySource opted into the tracer the same way Npgsql's
                     // is above, or its spans are created but never exported.
-                    .AddSource("Kart.Shared.Messaging.RabbitMq");
+                    .AddSource("Kart.Shared.Messaging.RabbitMq")
+                    // kart-user-service's async read-model projection poller has no in-flight
+                    // request/consume activity to inherit from, so it starts its own span.
+                    .AddSource("Kart.User.ReadModelProjection");
 
                 tracing.AddOtlpExporter(otlp =>
                 {

@@ -7,6 +7,76 @@ on:
     branches: [main, dev]
 
 jobs:
+  scope-guard:
+    name: Scope discipline (contracts + generic libs only)
+    runs-on: ubuntu-latest
+    # Closes PLATFORM_BLUEPRINT.md's Appendix "Open Decisions" #3: kart-shared must contain
+    # only versioned, published artifacts (event schemas, OpenAPI contracts, truly generic
+    # cross-cutting libraries) -- never domain logic, never a service's internal types
+    # (PLATFORM_BLUEPRINT.md §2.2/§2.3). This is a structural allowlist, not a heuristic, so
+    # it has no false positives: any new top-level folder, any new src/ or tests/ project, or
+    # any extra file dropped into a service's contracts/ folder fails CI until the allowlist
+    # below is deliberately updated -- the same "silent drift is the failure mode" reasoning
+    # already applied to §24.1's role-table/audit-column centralization.
+    #
+    # Lives here, not as a kart-devops reusable workflow, because kart-shared is currently its
+    # only consumer -- a "reusable" workflow for one caller is exactly the premature
+    # abstraction this repo's own standards reject (e.g. Module Federation, deferred for the
+    # same reason). Promote it to kart-devops if a second repo ever needs the identical guard.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Enforce allowed top-level layout and project set
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          allowed_src_projects="Kart.Shared.Auditing Kart.Shared.Configuration Kart.Shared.Domain Kart.Shared.ErrorHandling Kart.Shared.Messaging Kart.Shared.Observability"
+
+          # 1. Only known top-level entries.
+          for entry in */; do
+            name="${entry%/}"
+            case "$name" in
+              src|tests|contracts|artifacts) ;;
+              *) echo "::error::Unexpected top-level entry '$name/' in kart-shared. Only src/, tests/, contracts/, artifacts/ are allowed -- kart-shared is contracts + generic platform libs only (PLATFORM_BLUEPRINT.md §2.2)."; exit 1 ;;
+            esac
+          done
+
+          # 2. src/ may only contain the known generic Kart.Shared.* library projects.
+          for entry in src/*/; do
+            name="$(basename "$entry")"
+            if ! grep -qw "$name" <<< "$allowed_src_projects"; then
+              echo "::error::'src/$name' is not on the allowed generic-library list ($allowed_src_projects). Adding a domain-specific project to kart-shared is exactly what PLATFORM_BLUEPRINT.md §2.2 forbids -- if this is genuinely a new generic cross-cutting library, update the allowlist in this workflow deliberately."
+              exit 1
+            fi
+          done
+
+          # 3. tests/ may only contain <allowed-project>.Tests.
+          for entry in tests/*/; do
+            name="$(basename "$entry")"
+            base="${name%.Tests}"
+            if [[ "$name" != *.Tests ]] || ! grep -qw "$base" <<< "$allowed_src_projects"; then
+              echo "::error::'tests/$name' does not match an allowed '<Kart.Shared.X>.Tests' project."
+              exit 1
+            fi
+          done
+
+          # 4. Each service's contracts/ folder may only hold its two published contract files
+          #    -- never implementation code, never another service's contract.
+          for dir in contracts/*/; do
+            service="$(basename "$dir")"
+            for f in "$dir"*; do
+              fname="$(basename "$f")"
+              if [[ "$fname" != "api-contract.yaml" && "$fname" != "event-contract.md" ]]; then
+                echo "::error::Unexpected file 'contracts/$service/$fname' -- a service's contracts folder may only contain api-contract.yaml and event-contract.md."
+                exit 1
+              fi
+            done
+          done
+
+          echo "kart-shared scope-discipline check passed: only contracts + generic platform libs present."
+
   ci:
     # kart-conventions.md: "CI: service repos call the reusable workflow published from kart-devops."
     # kart-shared publishes NuGet packages, it does not ship a container, so the reusable
